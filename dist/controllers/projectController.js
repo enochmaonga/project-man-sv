@@ -64,7 +64,7 @@ const getProject = async (req, res) => {
 exports.getProject = getProject;
 const createProject = async (req, res) => {
     try {
-        const { name, description } = req.body;
+        const { name, description, category } = req.body;
         const ownerId = req.user?.id;
         if (!name) {
             res.status(400).json({ message: 'Project name is required' });
@@ -73,6 +73,7 @@ const createProject = async (req, res) => {
         const project = new Project_1.Project({
             name,
             description,
+            category: category || 'general',
             ownerId,
         });
         await project.save();
@@ -87,7 +88,7 @@ exports.createProject = createProject;
 const updateProject = async (req, res) => {
     try {
         const { id } = req.params;
-        const { name, description, status } = req.body;
+        const { name, description, status, category } = req.body;
         const ownerId = req.user?.id;
         const project = await Project_1.Project.findOne({ _id: id, ownerId });
         if (!project) {
@@ -100,6 +101,8 @@ const updateProject = async (req, res) => {
             project.description = description;
         if (status !== undefined)
             project.status = status;
+        if (category !== undefined)
+            project.category = category;
         await project.save();
         res.status(200).json(project);
     }

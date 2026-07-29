@@ -22,6 +22,11 @@ const projectSchema = new Schema(
       ref: 'User',
       required: true,
     },
+    category: {
+      type: String,
+      default: 'general',
+      trim: true,
+    },
   },
   {
     timestamps: true,

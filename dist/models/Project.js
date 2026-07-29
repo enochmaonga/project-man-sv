@@ -23,6 +23,11 @@ const projectSchema = new mongoose_1.Schema({
         ref: 'User',
         required: true,
     },
+    category: {
+        type: String,
+        default: 'general',
+        trim: true,
+    },
 }, {
     timestamps: true,
 });

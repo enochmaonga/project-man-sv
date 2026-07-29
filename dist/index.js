@@ -14,7 +14,7 @@ const transactionController_1 = require("./controllers/transactionController");
 // Load environment variables
 dotenv_1.default.config();
 const app = (0, express_1.default)();
-const port = process.env.PORT || 5000;
+const port = process.env.PORT || 5008;
 // Middleware
 app.use((0, cors_1.default)({
     origin: '*', // We can restrict this in production (e.g. to our Next.js frontend URL)

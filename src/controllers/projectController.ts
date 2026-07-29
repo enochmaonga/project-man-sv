@@ -70,7 +70,7 @@ export const getProject = async (req: AuthRequest, res: Response): Promise<void>
 
 export const createProject = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
-    const { name, description } = req.body;
+    const { name, description, category } = req.body;
     const ownerId = req.user?.id;
 
     if (!name) {
@@ -81,6 +81,7 @@ export const createProject = async (req: AuthRequest, res: Response): Promise<vo
     const project = new Project({
       name,
       description,
+      category: category || 'general',
       ownerId,
     });
 
@@ -95,7 +96,7 @@ export const createProject = async (req: AuthRequest, res: Response): Promise<vo
 export const updateProject = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const { id } = req.params;
-    const { name, description, status } = req.body;
+    const { name, description, status, category } = req.body;
     const ownerId = req.user?.id;
 
     const project = await Project.findOne({ _id: id, ownerId });
@@ -107,6 +108,7 @@ export const updateProject = async (req: AuthRequest, res: Response): Promise<vo
     if (name !== undefined) project.name = name;
     if (description !== undefined) project.description = description;
     if (status !== undefined) project.status = status;
+    if (category !== undefined) project.category = category;
 
     await project.save();
     res.status(200).json(project);
