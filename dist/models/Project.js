@@ -28,6 +28,12 @@ const projectSchema = new mongoose_1.Schema({
         default: 'general',
         trim: true,
     },
+    collaborators: [
+        {
+            type: mongoose_1.Schema.Types.ObjectId,
+            ref: 'User',
+        },
+    ],
 }, {
     timestamps: true,
 });

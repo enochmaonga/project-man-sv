@@ -32,6 +32,8 @@ app.get('/api/projects/:id', auth_1.authMiddleware, projectController_1.getProje
 app.post('/api/projects', auth_1.authMiddleware, projectController_1.createProject);
 app.put('/api/projects/:id', auth_1.authMiddleware, projectController_1.updateProject);
 app.delete('/api/projects/:id', auth_1.authMiddleware, projectController_1.deleteProject);
+app.post('/api/projects/:id/share', auth_1.authMiddleware, projectController_1.shareProject);
+app.delete('/api/projects/:id/collaborators/:collaboratorId', auth_1.authMiddleware, projectController_1.removeCollaborator);
 // Protected Transaction Routes
 app.get('/api/transactions/project/:projectId', auth_1.authMiddleware, transactionController_1.getTransactionsByProject);
 app.post('/api/transactions', auth_1.authMiddleware, transactionController_1.createTransaction);

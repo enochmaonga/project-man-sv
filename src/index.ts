@@ -10,6 +10,8 @@ import {
   createProject,
   updateProject,
   deleteProject,
+  shareProject,
+  removeCollaborator,
 } from './controllers/projectController';
 import {
   getTransactionsByProject,
@@ -43,6 +45,8 @@ app.get('/api/projects/:id', authMiddleware as any, getProject as any);
 app.post('/api/projects', authMiddleware as any, createProject as any);
 app.put('/api/projects/:id', authMiddleware as any, updateProject as any);
 app.delete('/api/projects/:id', authMiddleware as any, deleteProject as any);
+app.post('/api/projects/:id/share', authMiddleware as any, shareProject as any);
+app.delete('/api/projects/:id/collaborators/:collaboratorId', authMiddleware as any, removeCollaborator as any);
 
 // Protected Transaction Routes
 app.get('/api/transactions/project/:projectId', authMiddleware as any, getTransactionsByProject as any);

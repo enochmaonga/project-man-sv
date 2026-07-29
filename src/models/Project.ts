@@ -27,6 +27,12 @@ const projectSchema = new Schema(
       default: 'general',
       trim: true,
     },
+    collaborators: [
+      {
+        type: Schema.Types.ObjectId,
+        ref: 'User',
+      },
+    ],
   },
   {
     timestamps: true,

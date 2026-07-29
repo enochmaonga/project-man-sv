@@ -3,21 +3,24 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.deleteTransaction = exports.updateTransaction = exports.createTransaction = exports.getTransactionsByProject = void 0;
 const Project_1 = require("../models/Project");
 const Transaction_1 = require("../models/Transaction");
-// Helper to verify project ownership
-const verifyProjectOwnership = async (projectId, ownerId) => {
-    const project = await Project_1.Project.findOne({ _id: projectId, ownerId });
+// Helper to verify user access to project (as owner or collaborator)
+const verifyProjectAccess = async (projectId, userId) => {
+    const project = await Project_1.Project.findOne({
+        _id: projectId,
+        $or: [{ ownerId: userId }, { collaborators: userId }],
+    });
     return !!project;
 };
 const getTransactionsByProject = async (req, res) => {
     try {
         const { projectId } = req.params;
-        const ownerId = req.user?.id;
-        if (!ownerId) {
+        const userId = req.user?.id;
+        if (!userId) {
             res.status(401).json({ message: 'Unauthorized' });
             return;
         }
-        const isOwner = await verifyProjectOwnership(projectId, ownerId);
-        if (!isOwner) {
+        const hasAccess = await verifyProjectAccess(projectId, userId);
+        if (!hasAccess) {
             res.status(403).json({ message: 'Forbidden: Access to this project is denied' });
             return;
         }
@@ -33,8 +36,8 @@ exports.getTransactionsByProject = getTransactionsByProject;
 const createTransaction = async (req, res) => {
     try {
         const { projectId, type, category, amount, description, date } = req.body;
-        const ownerId = req.user?.id;
-        if (!ownerId) {
+        const userId = req.user?.id;
+        if (!userId) {
             res.status(401).json({ message: 'Unauthorized' });
             return;
         }
@@ -42,8 +45,8 @@ const createTransaction = async (req, res) => {
             res.status(400).json({ message: 'projectId, type, category, and amount are required' });
             return;
         }
-        const isOwner = await verifyProjectOwnership(projectId, ownerId);
-        if (!isOwner) {
+        const hasAccess = await verifyProjectAccess(projectId, userId);
+        if (!hasAccess) {
             res.status(403).json({ message: 'Forbidden: Cannot add transaction to this project' });
             return;
         }
@@ -68,8 +71,8 @@ const updateTransaction = async (req, res) => {
     try {
         const { id } = req.params;
         const { type, category, amount, description, date } = req.body;
-        const ownerId = req.user?.id;
-        if (!ownerId) {
+        const userId = req.user?.id;
+        if (!userId) {
             res.status(401).json({ message: 'Unauthorized' });
             return;
         }
@@ -78,8 +81,8 @@ const updateTransaction = async (req, res) => {
             res.status(404).json({ message: 'Transaction not found' });
             return;
         }
-        const isOwner = await verifyProjectOwnership(transaction.projectId.toString(), ownerId);
-        if (!isOwner) {
+        const hasAccess = await verifyProjectAccess(transaction.projectId.toString(), userId);
+        if (!hasAccess) {
             res.status(403).json({ message: 'Forbidden: Cannot update this transaction' });
             return;
         }
@@ -105,8 +108,8 @@ exports.updateTransaction = updateTransaction;
 const deleteTransaction = async (req, res) => {
     try {
         const { id } = req.params;
-        const ownerId = req.user?.id;
-        if (!ownerId) {
+        const userId = req.user?.id;
+        if (!userId) {
             res.status(401).json({ message: 'Unauthorized' });
             return;
         }
@@ -115,8 +118,8 @@ const deleteTransaction = async (req, res) => {
             res.status(404).json({ message: 'Transaction not found' });
             return;
         }
-        const isOwner = await verifyProjectOwnership(transaction.projectId.toString(), ownerId);
-        if (!isOwner) {
+        const hasAccess = await verifyProjectAccess(transaction.projectId.toString(), userId);
+        if (!hasAccess) {
             res.status(403).json({ message: 'Forbidden: Cannot delete this transaction' });
             return;
         }

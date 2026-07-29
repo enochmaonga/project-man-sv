@@ -3,24 +3,27 @@ import { AuthRequest } from '../middleware/auth';
 import { Project } from '../models/Project';
 import { Transaction } from '../models/Transaction';
 
-// Helper to verify project ownership
-const verifyProjectOwnership = async (projectId: string, ownerId: string): Promise<boolean> => {
-  const project = await Project.findOne({ _id: projectId, ownerId });
+// Helper to verify user access to project (as owner or collaborator)
+const verifyProjectAccess = async (projectId: string, userId: string): Promise<boolean> => {
+  const project = await Project.findOne({
+    _id: projectId,
+    $or: [{ ownerId: userId }, { collaborators: userId }],
+  });
   return !!project;
 };
 
 export const getTransactionsByProject = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const { projectId } = req.params;
-    const ownerId = req.user?.id;
+    const userId = req.user?.id;
 
-    if (!ownerId) {
+    if (!userId) {
       res.status(401).json({ message: 'Unauthorized' });
       return;
     }
 
-    const isOwner = await verifyProjectOwnership(projectId, ownerId);
-    if (!isOwner) {
+    const hasAccess = await verifyProjectAccess(projectId, userId);
+    if (!hasAccess) {
       res.status(403).json({ message: 'Forbidden: Access to this project is denied' });
       return;
     }
@@ -36,9 +39,9 @@ export const getTransactionsByProject = async (req: AuthRequest, res: Response):
 export const createTransaction = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const { projectId, type, category, amount, description, date } = req.body;
-    const ownerId = req.user?.id;
+    const userId = req.user?.id;
 
-    if (!ownerId) {
+    if (!userId) {
       res.status(401).json({ message: 'Unauthorized' });
       return;
     }
@@ -48,8 +51,8 @@ export const createTransaction = async (req: AuthRequest, res: Response): Promis
       return;
     }
 
-    const isOwner = await verifyProjectOwnership(projectId, ownerId);
-    if (!isOwner) {
+    const hasAccess = await verifyProjectAccess(projectId, userId);
+    if (!hasAccess) {
       res.status(403).json({ message: 'Forbidden: Cannot add transaction to this project' });
       return;
     }
@@ -75,9 +78,9 @@ export const updateTransaction = async (req: AuthRequest, res: Response): Promis
   try {
     const { id } = req.params;
     const { type, category, amount, description, date } = req.body;
-    const ownerId = req.user?.id;
+    const userId = req.user?.id;
 
-    if (!ownerId) {
+    if (!userId) {
       res.status(401).json({ message: 'Unauthorized' });
       return;
     }
@@ -88,8 +91,8 @@ export const updateTransaction = async (req: AuthRequest, res: Response): Promis
       return;
     }
 
-    const isOwner = await verifyProjectOwnership(transaction.projectId.toString(), ownerId);
-    if (!isOwner) {
+    const hasAccess = await verifyProjectAccess(transaction.projectId.toString(), userId);
+    if (!hasAccess) {
       res.status(403).json({ message: 'Forbidden: Cannot update this transaction' });
       return;
     }
@@ -111,9 +114,9 @@ export const updateTransaction = async (req: AuthRequest, res: Response): Promis
 export const deleteTransaction = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const { id } = req.params;
-    const ownerId = req.user?.id;
+    const userId = req.user?.id;
 
-    if (!ownerId) {
+    if (!userId) {
       res.status(401).json({ message: 'Unauthorized' });
       return;
     }
@@ -124,8 +127,8 @@ export const deleteTransaction = async (req: AuthRequest, res: Response): Promis
       return;
     }
 
-    const isOwner = await verifyProjectOwnership(transaction.projectId.toString(), ownerId);
-    if (!isOwner) {
+    const hasAccess = await verifyProjectAccess(transaction.projectId.toString(), userId);
+    if (!hasAccess) {
       res.status(403).json({ message: 'Forbidden: Cannot delete this transaction' });
       return;
     }

@@ -2,11 +2,22 @@ import { Response } from 'express';
 import { AuthRequest } from '../middleware/auth';
 import { Project } from '../models/Project';
 import { Transaction } from '../models/Transaction';
+import { User } from '../models/User';
 
 export const getProjects = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
-    const ownerId = req.user?.id;
-    const projects = await Project.find({ ownerId }).sort({ createdAt: -1 });
+    const userId = req.user?.id;
+    if (!userId) {
+      res.status(401).json({ message: 'Unauthorized' });
+      return;
+    }
+
+    const projects = await Project.find({
+      $or: [{ ownerId: userId }, { collaborators: userId }],
+    })
+      .populate('ownerId', 'name email')
+      .populate('collaborators', 'name email')
+      .sort({ createdAt: -1 });
 
     // Enriched projects with sum of income and expenses
     const enrichedProjects = await Promise.all(
@@ -38,11 +49,22 @@ export const getProjects = async (req: AuthRequest, res: Response): Promise<void
 export const getProject = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const { id } = req.params;
-    const ownerId = req.user?.id;
+    const userId = req.user?.id;
 
-    const project = await Project.findOne({ _id: id, ownerId });
+    if (!userId) {
+      res.status(401).json({ message: 'Unauthorized' });
+      return;
+    }
+
+    const project = await Project.findOne({
+      _id: id,
+      $or: [{ ownerId: userId }, { collaborators: userId }],
+    })
+      .populate('ownerId', 'name email')
+      .populate('collaborators', 'name email');
+
     if (!project) {
-      res.status(404).json({ message: 'Project not found' });
+      res.status(404).json({ message: 'Project not found or access denied' });
       return;
     }
 
@@ -83,9 +105,11 @@ export const createProject = async (req: AuthRequest, res: Response): Promise<vo
       description,
       category: category || 'general',
       ownerId,
+      collaborators: [],
     });
 
     await project.save();
+    await project.populate('ownerId', 'name email');
     res.status(201).json(project);
   } catch (error) {
     console.error('Create project error:', error);
@@ -97,9 +121,13 @@ export const updateProject = async (req: AuthRequest, res: Response): Promise<vo
   try {
     const { id } = req.params;
     const { name, description, status, category } = req.body;
-    const ownerId = req.user?.id;
+    const userId = req.user?.id;
 
-    const project = await Project.findOne({ _id: id, ownerId });
+    const project = await Project.findOne({
+      _id: id,
+      $or: [{ ownerId: userId }, { collaborators: userId }],
+    });
+
     if (!project) {
       res.status(404).json({ message: 'Project not found or unauthorized' });
       return;
@@ -111,6 +139,9 @@ export const updateProject = async (req: AuthRequest, res: Response): Promise<vo
     if (category !== undefined) project.category = category;
 
     await project.save();
+    await project.populate('ownerId', 'name email');
+    await project.populate('collaborators', 'name email');
+
     res.status(200).json(project);
   } catch (error) {
     console.error('Update project error:', error);
@@ -123,9 +154,10 @@ export const deleteProject = async (req: AuthRequest, res: Response): Promise<vo
     const { id } = req.params;
     const ownerId = req.user?.id;
 
+    // Only owner can delete project
     const project = await Project.findOneAndDelete({ _id: id, ownerId });
     if (!project) {
-      res.status(404).json({ message: 'Project not found or unauthorized' });
+      res.status(404).json({ message: 'Project not found or unauthorized (only owner can delete)' });
       return;
     }
 
@@ -136,5 +168,98 @@ export const deleteProject = async (req: AuthRequest, res: Response): Promise<vo
   } catch (error) {
     console.error('Delete project error:', error);
     res.status(500).json({ message: 'Failed to delete project' });
+  }
+};
+
+export const shareProject = async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const { id } = req.params;
+    const { email } = req.body;
+    const userId = req.user?.id;
+
+    if (!email) {
+      res.status(400).json({ message: 'Email address is required to share project' });
+      return;
+    }
+
+    const project = await Project.findOne({
+      _id: id,
+      $or: [{ ownerId: userId }, { collaborators: userId }],
+    });
+
+    if (!project) {
+      res.status(404).json({ message: 'Project not found or access denied' });
+      return;
+    }
+
+    const targetUser = await User.findOne({ email: email.toLowerCase().trim() });
+    if (!targetUser) {
+      res.status(404).json({ message: `No registered user found with email "${email}". Ask them to sign up first.` });
+      return;
+    }
+
+    // Check if target user is owner
+    if (project.ownerId.toString() === targetUser._id.toString()) {
+      res.status(400).json({ message: 'This user is already the owner of this project.' });
+      return;
+    }
+
+    // Check if target user is already a collaborator
+    const isAlreadyCollab = project.collaborators.some(
+      (collabId) => collabId.toString() === targetUser._id.toString()
+    );
+
+    if (isAlreadyCollab) {
+      res.status(400).json({ message: 'User is already a collaborator on this project.' });
+      return;
+    }
+
+    project.collaborators.push(targetUser._id);
+    await project.save();
+
+    await project.populate('ownerId', 'name email');
+    await project.populate('collaborators', 'name email');
+
+    res.status(200).json({
+      message: `Project successfully shared with ${targetUser.name} (${targetUser.email})`,
+      project,
+    });
+  } catch (error) {
+    console.error('Share project error:', error);
+    res.status(500).json({ message: 'Failed to share project' });
+  }
+};
+
+export const removeCollaborator = async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const { id, collaboratorId } = req.params;
+    const userId = req.user?.id;
+
+    const project = await Project.findOne({
+      _id: id,
+      $or: [{ ownerId: userId }, { collaborators: userId }],
+    });
+
+    if (!project) {
+      res.status(404).json({ message: 'Project not found or access denied' });
+      return;
+    }
+
+    // Remove collaborator
+    project.collaborators = project.collaborators.filter(
+      (cId) => cId.toString() !== collaboratorId
+    );
+
+    await project.save();
+    await project.populate('ownerId', 'name email');
+    await project.populate('collaborators', 'name email');
+
+    res.status(200).json({
+      message: 'Collaborator removed successfully',
+      project,
+    });
+  } catch (error) {
+    console.error('Remove collaborator error:', error);
+    res.status(500).json({ message: 'Failed to remove collaborator' });
   }
 };
