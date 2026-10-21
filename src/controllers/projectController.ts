@@ -120,7 +120,7 @@ export const createProject = async (req: AuthRequest, res: Response): Promise<vo
 export const updateProject = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const { id } = req.params;
-    const { name, description, status, category } = req.body;
+    const { name, description, status, category, customExpenseCategories, customIncomeCategories } = req.body;
     const userId = req.user?.id;
 
     const project = await Project.findOne({
@@ -137,6 +137,8 @@ export const updateProject = async (req: AuthRequest, res: Response): Promise<vo
     if (description !== undefined) project.description = description;
     if (status !== undefined) project.status = status;
     if (category !== undefined) project.category = category;
+    if (customExpenseCategories !== undefined) (project as any).customExpenseCategories = customExpenseCategories;
+    if (customIncomeCategories !== undefined) (project as any).customIncomeCategories = customIncomeCategories;
 
     await project.save();
     await project.populate('ownerId', 'name email');
@@ -146,6 +148,55 @@ export const updateProject = async (req: AuthRequest, res: Response): Promise<vo
   } catch (error) {
     console.error('Update project error:', error);
     res.status(500).json({ message: 'Failed to update project' });
+  }
+};
+
+export const addCategory = async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const { id } = req.params;
+    const { type, category } = req.body;
+    const userId = req.user?.id;
+
+    if (!category || !category.trim()) {
+      res.status(400).json({ message: 'Category name is required' });
+      return;
+    }
+    if (!type || (type !== 'expense' && type !== 'income')) {
+      res.status(400).json({ message: 'Type must be either expense or income' });
+      return;
+    }
+
+    const project = await Project.findOne({
+      _id: id,
+      $or: [{ ownerId: userId }, { collaborators: userId }],
+    });
+
+    if (!project) {
+      res.status(404).json({ message: 'Project not found or unauthorized' });
+      return;
+    }
+
+    const cleanCategory = category.trim();
+    if (type === 'expense') {
+      if (!(project as any).customExpenseCategories) (project as any).customExpenseCategories = [];
+      if (!(project as any).customExpenseCategories.includes(cleanCategory)) {
+        (project as any).customExpenseCategories.push(cleanCategory);
+      }
+    } else {
+      if (!(project as any).customIncomeCategories) (project as any).customIncomeCategories = [];
+      if (!(project as any).customIncomeCategories.includes(cleanCategory)) {
+        (project as any).customIncomeCategories.push(cleanCategory);
+      }
+    }
+
+    await project.save();
+    await project.populate('ownerId', 'name email');
+    await project.populate('collaborators', 'name email');
+
+    res.status(200).json(project);
+  } catch (error) {
+    console.error('Add category error:', error);
+    res.status(500).json({ message: 'Failed to add category' });
   }
 };
 

@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.removeCollaborator = exports.shareProject = exports.deleteProject = exports.updateProject = exports.createProject = exports.getProject = exports.getProjects = void 0;
+exports.removeCollaborator = exports.shareProject = exports.deleteProject = exports.addCategory = exports.updateProject = exports.createProject = exports.getProject = exports.getProjects = void 0;
 const Project_1 = require("../models/Project");
 const Transaction_1 = require("../models/Transaction");
 const User_1 = require("../models/User");
@@ -109,7 +109,7 @@ exports.createProject = createProject;
 const updateProject = async (req, res) => {
     try {
         const { id } = req.params;
-        const { name, description, status, category } = req.body;
+        const { name, description, status, category, customExpenseCategories, customIncomeCategories } = req.body;
         const userId = req.user?.id;
         const project = await Project_1.Project.findOne({
             _id: id,
@@ -127,6 +127,10 @@ const updateProject = async (req, res) => {
             project.status = status;
         if (category !== undefined)
             project.category = category;
+        if (customExpenseCategories !== undefined)
+            project.customExpenseCategories = customExpenseCategories;
+        if (customIncomeCategories !== undefined)
+            project.customIncomeCategories = customIncomeCategories;
         await project.save();
         await project.populate('ownerId', 'name email');
         await project.populate('collaborators', 'name email');
@@ -138,6 +142,53 @@ const updateProject = async (req, res) => {
     }
 };
 exports.updateProject = updateProject;
+const addCategory = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { type, category } = req.body;
+        const userId = req.user?.id;
+        if (!category || !category.trim()) {
+            res.status(400).json({ message: 'Category name is required' });
+            return;
+        }
+        if (!type || (type !== 'expense' && type !== 'income')) {
+            res.status(400).json({ message: 'Type must be either expense or income' });
+            return;
+        }
+        const project = await Project_1.Project.findOne({
+            _id: id,
+            $or: [{ ownerId: userId }, { collaborators: userId }],
+        });
+        if (!project) {
+            res.status(404).json({ message: 'Project not found or unauthorized' });
+            return;
+        }
+        const cleanCategory = category.trim();
+        if (type === 'expense') {
+            if (!project.customExpenseCategories)
+                project.customExpenseCategories = [];
+            if (!project.customExpenseCategories.includes(cleanCategory)) {
+                project.customExpenseCategories.push(cleanCategory);
+            }
+        }
+        else {
+            if (!project.customIncomeCategories)
+                project.customIncomeCategories = [];
+            if (!project.customIncomeCategories.includes(cleanCategory)) {
+                project.customIncomeCategories.push(cleanCategory);
+            }
+        }
+        await project.save();
+        await project.populate('ownerId', 'name email');
+        await project.populate('collaborators', 'name email');
+        res.status(200).json(project);
+    }
+    catch (error) {
+        console.error('Add category error:', error);
+        res.status(500).json({ message: 'Failed to add category' });
+    }
+};
+exports.addCategory = addCategory;
 const deleteProject = async (req, res) => {
     try {
         const { id } = req.params;

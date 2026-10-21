@@ -33,6 +33,14 @@ const projectSchema = new Schema(
         ref: 'User',
       },
     ],
+    customExpenseCategories: {
+      type: [String],
+      default: [],
+    },
+    customIncomeCategories: {
+      type: [String],
+      default: [],
+    },
   },
   {
     timestamps: true,
