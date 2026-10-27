@@ -137,19 +137,36 @@ export const deleteTransaction = async (req: AuthRequest, res: Response): Promis
       return;
     }
 
-    // Clean up uploaded files associated with this transaction
+    // Clean up uploaded files associated with this transaction from GridFS and disk
     if (transaction.attachments && transaction.attachments.length > 0) {
       for (const att of transaction.attachments) {
-        if (att.url && att.url.startsWith('/uploads/')) {
+        if (!att.url) continue;
+
+        // Try deleting from GridFS
+        try {
+          const { getGridFSBucket } = require('./uploadController');
+          const bucket = getGridFSBucket();
+          const match = att.url.match(/\/attachments\/([a-f\d]{24})/i);
+          if (match && match[1]) {
+            await bucket.delete(new (require('mongoose').Types.ObjectId)(match[1]));
+          } else {
+            const filename = path.basename(att.url);
+            const files = await bucket.find({ filename }).toArray();
+            for (const f of files) {
+              await bucket.delete(f._id);
+            }
+          }
+        } catch (err) {}
+
+        // Clean up disk copy if present
+        if (att.url.startsWith('/uploads/')) {
           const filename = att.url.replace(/^\/uploads\//, '');
           const safeFilename = path.basename(filename);
           const filePath = path.resolve(process.cwd(), 'uploads', safeFilename);
           if (fs.existsSync(filePath)) {
             try {
               fs.unlinkSync(filePath);
-            } catch (err) {
-              console.error('Failed to unlink file on transaction delete:', filePath, err);
-            }
+            } catch (err) {}
           }
         }
       }

@@ -22,7 +22,7 @@ import {
   deleteTransaction,
 } from './controllers/transactionController';
 import { uploadMiddleware } from './middleware/upload';
-import { uploadFiles, deleteUploadedFile } from './controllers/uploadController';
+import { uploadFiles, serveAttachment, deleteUploadedFile } from './controllers/uploadController';
 
 // Load environment variables
 dotenv.config();
@@ -37,9 +37,6 @@ app.use(cors({
   allowedHeaders: ['Content-Type', 'Authorization'],
 }));
 app.use(express.json());
-
-// Serve static uploaded files (PDF, Word, Excel, Images)
-app.use('/uploads', express.static(path.resolve(process.cwd(), 'uploads')));
 
 // Routes
 // Public Auth Routes
@@ -65,6 +62,17 @@ app.delete('/api/transactions/:id', authMiddleware as any, deleteTransaction as 
 // Protected File Upload Routes
 app.post('/api/upload', authMiddleware as any, uploadMiddleware, uploadFiles as any);
 app.delete('/api/upload/:filename', authMiddleware as any, deleteUploadedFile as any);
+
+// Attachment Serving Routes (GridFS + local disk fallback)
+// Accessible both publicly and within auth context for downloads & inline previews
+app.get('/api/attachments/:id', serveAttachment as any);
+app.get('/api/attachments/:id/:filename', serveAttachment as any);
+app.get('/uploads/:filename', serveAttachment as any);
+app.get('/api/uploads/:filename', serveAttachment as any);
+
+// Static uploads fallback
+app.use('/uploads', express.static(path.resolve(process.cwd(), 'uploads')));
+app.use('/api/uploads', express.static(path.resolve(process.cwd(), 'uploads')));
 
 // Health Check
 app.get('/health', (req, res) => {

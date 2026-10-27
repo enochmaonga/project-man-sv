@@ -1,27 +1,10 @@
 import multer from 'multer';
 import path from 'path';
-import fs from 'fs';
 import { Request, Response, NextFunction } from 'express';
 
-const uploadsDir = path.resolve(process.cwd(), 'uploads');
-if (!fs.existsSync(uploadsDir)) {
-  fs.mkdirSync(uploadsDir, { recursive: true });
-}
-
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    cb(null, uploadsDir);
-  },
-  filename: (req, file, cb) => {
-    const uniqueSuffix = `${Date.now()}-${Math.round(Math.random() * 1e9)}`;
-    const ext = path.extname(file.originalname).toLowerCase();
-    const baseName = path
-      .basename(file.originalname, ext)
-      .replace(/[^a-zA-Z0-9_-]/g, '_')
-      .slice(0, 50);
-    cb(null, `${baseName}-${uniqueSuffix}${ext}`);
-  },
-});
+// Use memory storage so file buffers can be saved directly to MongoDB GridFS
+// and works across serverless / ephemeral containers (Render, Vercel, Heroku)
+const storage = multer.memoryStorage();
 
 const allowedExtensions = new Set([
   // PDF
