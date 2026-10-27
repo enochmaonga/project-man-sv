@@ -2,6 +2,8 @@ import { Response } from 'express';
 import { AuthRequest } from '../middleware/auth';
 import { Project } from '../models/Project';
 import { Transaction } from '../models/Transaction';
+import fs from 'fs';
+import path from 'path';
 
 // Helper to verify user access to project (as owner or collaborator)
 const verifyProjectAccess = async (projectId: string, userId: string): Promise<boolean> => {
@@ -38,7 +40,7 @@ export const getTransactionsByProject = async (req: AuthRequest, res: Response):
 
 export const createTransaction = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
-    const { projectId, type, category, amount, description, date } = req.body;
+    const { projectId, type, category, amount, description, date, attachments } = req.body;
     const userId = req.user?.id;
 
     if (!userId) {
@@ -64,6 +66,7 @@ export const createTransaction = async (req: AuthRequest, res: Response): Promis
       amount,
       description,
       date: date ? new Date(date) : new Date(),
+      attachments: Array.isArray(attachments) ? attachments : [],
     });
 
     await transaction.save();
@@ -77,7 +80,7 @@ export const createTransaction = async (req: AuthRequest, res: Response): Promis
 export const updateTransaction = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const { id } = req.params;
-    const { type, category, amount, description, date } = req.body;
+    const { type, category, amount, description, date, attachments } = req.body;
     const userId = req.user?.id;
 
     if (!userId) {
@@ -102,6 +105,7 @@ export const updateTransaction = async (req: AuthRequest, res: Response): Promis
     if (amount !== undefined) transaction.amount = amount;
     if (description !== undefined) transaction.description = description;
     if (date !== undefined) transaction.date = new Date(date);
+    if (attachments !== undefined) transaction.attachments = attachments;
 
     await transaction.save();
     res.status(200).json(transaction);
@@ -131,6 +135,24 @@ export const deleteTransaction = async (req: AuthRequest, res: Response): Promis
     if (!hasAccess) {
       res.status(403).json({ message: 'Forbidden: Cannot delete this transaction' });
       return;
+    }
+
+    // Clean up uploaded files associated with this transaction
+    if (transaction.attachments && transaction.attachments.length > 0) {
+      for (const att of transaction.attachments) {
+        if (att.url && att.url.startsWith('/uploads/')) {
+          const filename = att.url.replace(/^\/uploads\//, '');
+          const safeFilename = path.basename(filename);
+          const filePath = path.resolve(process.cwd(), 'uploads', safeFilename);
+          if (fs.existsSync(filePath)) {
+            try {
+              fs.unlinkSync(filePath);
+            } catch (err) {
+              console.error('Failed to unlink file on transaction delete:', filePath, err);
+            }
+          }
+        }
+      }
     }
 
     await Transaction.findByIdAndDelete(id);

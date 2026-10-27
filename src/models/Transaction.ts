@@ -1,6 +1,55 @@
-import { Schema, model } from 'mongoose';
+import { Schema, model, Document } from 'mongoose';
 
-const transactionSchema = new Schema(
+export interface IAttachment {
+  name: string;
+  url: string;
+  size?: number;
+  mimeType?: string;
+  uploadedAt?: Date;
+}
+
+export interface ITransaction extends Document {
+  projectId: Schema.Types.ObjectId;
+  type: 'expense' | 'income';
+  category: string;
+  amount: number;
+  description: string;
+  date: Date;
+  attachments: IAttachment[];
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+const attachmentSchema = new Schema(
+  {
+    name: {
+      type: String,
+      required: true,
+      trim: true,
+    },
+    url: {
+      type: String,
+      required: true,
+      trim: true,
+    },
+    size: {
+      type: Number,
+      default: 0,
+    },
+    mimeType: {
+      type: String,
+      default: '',
+      trim: true,
+    },
+    uploadedAt: {
+      type: Date,
+      default: Date.now,
+    },
+  },
+  { _id: true }
+);
+
+const transactionSchema = new Schema<ITransaction>(
   {
     projectId: {
       type: Schema.Types.ObjectId,
@@ -32,10 +81,14 @@ const transactionSchema = new Schema(
       required: [true, 'Date is required'],
       default: Date.now,
     },
+    attachments: {
+      type: [attachmentSchema],
+      default: [],
+    },
   },
   {
     timestamps: true,
   }
 );
 
-export const Transaction = model('Transaction', transactionSchema);
+export const Transaction = model<ITransaction>('Transaction', transactionSchema);

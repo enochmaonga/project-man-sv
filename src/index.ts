@@ -1,6 +1,7 @@
 import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
+import path from 'path';
 import { connectDB } from './db';
 import { register, login } from './controllers/authController';
 import { authMiddleware } from './middleware/auth';
@@ -20,6 +21,8 @@ import {
   updateTransaction,
   deleteTransaction,
 } from './controllers/transactionController';
+import { uploadMiddleware } from './middleware/upload';
+import { uploadFiles, deleteUploadedFile } from './controllers/uploadController';
 
 // Load environment variables
 dotenv.config();
@@ -34,6 +37,9 @@ app.use(cors({
   allowedHeaders: ['Content-Type', 'Authorization'],
 }));
 app.use(express.json());
+
+// Serve static uploaded files (PDF, Word, Excel, Images)
+app.use('/uploads', express.static(path.resolve(process.cwd(), 'uploads')));
 
 // Routes
 // Public Auth Routes
@@ -55,6 +61,10 @@ app.get('/api/transactions/project/:projectId', authMiddleware as any, getTransa
 app.post('/api/transactions', authMiddleware as any, createTransaction as any);
 app.put('/api/transactions/:id', authMiddleware as any, updateTransaction as any);
 app.delete('/api/transactions/:id', authMiddleware as any, deleteTransaction as any);
+
+// Protected File Upload Routes
+app.post('/api/upload', authMiddleware as any, uploadMiddleware, uploadFiles as any);
+app.delete('/api/upload/:filename', authMiddleware as any, deleteUploadedFile as any);
 
 // Health Check
 app.get('/health', (req, res) => {

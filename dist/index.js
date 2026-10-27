@@ -6,11 +6,14 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = __importDefault(require("express"));
 const cors_1 = __importDefault(require("cors"));
 const dotenv_1 = __importDefault(require("dotenv"));
+const path_1 = __importDefault(require("path"));
 const db_1 = require("./db");
 const authController_1 = require("./controllers/authController");
 const auth_1 = require("./middleware/auth");
 const projectController_1 = require("./controllers/projectController");
 const transactionController_1 = require("./controllers/transactionController");
+const upload_1 = require("./middleware/upload");
+const uploadController_1 = require("./controllers/uploadController");
 // Load environment variables
 dotenv_1.default.config();
 const app = (0, express_1.default)();
@@ -22,6 +25,8 @@ app.use((0, cors_1.default)({
     allowedHeaders: ['Content-Type', 'Authorization'],
 }));
 app.use(express_1.default.json());
+// Serve static uploaded files (PDF, Word, Excel, Images)
+app.use('/uploads', express_1.default.static(path_1.default.resolve(process.cwd(), 'uploads')));
 // Routes
 // Public Auth Routes
 app.post('/api/auth/register', authController_1.register);
@@ -40,6 +45,9 @@ app.get('/api/transactions/project/:projectId', auth_1.authMiddleware, transacti
 app.post('/api/transactions', auth_1.authMiddleware, transactionController_1.createTransaction);
 app.put('/api/transactions/:id', auth_1.authMiddleware, transactionController_1.updateTransaction);
 app.delete('/api/transactions/:id', auth_1.authMiddleware, transactionController_1.deleteTransaction);
+// Protected File Upload Routes
+app.post('/api/upload', auth_1.authMiddleware, upload_1.uploadMiddleware, uploadController_1.uploadFiles);
+app.delete('/api/upload/:filename', auth_1.authMiddleware, uploadController_1.deleteUploadedFile);
 // Health Check
 app.get('/health', (req, res) => {
     res.status(200).json({ status: 'ok', timestamp: new Date() });

@@ -1,8 +1,13 @@
 "use strict";
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.deleteTransaction = exports.updateTransaction = exports.createTransaction = exports.getTransactionsByProject = void 0;
 const Project_1 = require("../models/Project");
 const Transaction_1 = require("../models/Transaction");
+const fs_1 = __importDefault(require("fs"));
+const path_1 = __importDefault(require("path"));
 // Helper to verify user access to project (as owner or collaborator)
 const verifyProjectAccess = async (projectId, userId) => {
     const project = await Project_1.Project.findOne({
@@ -35,7 +40,7 @@ const getTransactionsByProject = async (req, res) => {
 exports.getTransactionsByProject = getTransactionsByProject;
 const createTransaction = async (req, res) => {
     try {
-        const { projectId, type, category, amount, description, date } = req.body;
+        const { projectId, type, category, amount, description, date, attachments } = req.body;
         const userId = req.user?.id;
         if (!userId) {
             res.status(401).json({ message: 'Unauthorized' });
@@ -57,6 +62,7 @@ const createTransaction = async (req, res) => {
             amount,
             description,
             date: date ? new Date(date) : new Date(),
+            attachments: Array.isArray(attachments) ? attachments : [],
         });
         await transaction.save();
         res.status(201).json(transaction);
@@ -70,7 +76,7 @@ exports.createTransaction = createTransaction;
 const updateTransaction = async (req, res) => {
     try {
         const { id } = req.params;
-        const { type, category, amount, description, date } = req.body;
+        const { type, category, amount, description, date, attachments } = req.body;
         const userId = req.user?.id;
         if (!userId) {
             res.status(401).json({ message: 'Unauthorized' });
@@ -96,6 +102,8 @@ const updateTransaction = async (req, res) => {
             transaction.description = description;
         if (date !== undefined)
             transaction.date = new Date(date);
+        if (attachments !== undefined)
+            transaction.attachments = attachments;
         await transaction.save();
         res.status(200).json(transaction);
     }
@@ -122,6 +130,24 @@ const deleteTransaction = async (req, res) => {
         if (!hasAccess) {
             res.status(403).json({ message: 'Forbidden: Cannot delete this transaction' });
             return;
+        }
+        // Clean up uploaded files associated with this transaction
+        if (transaction.attachments && transaction.attachments.length > 0) {
+            for (const att of transaction.attachments) {
+                if (att.url && att.url.startsWith('/uploads/')) {
+                    const filename = att.url.replace(/^\/uploads\//, '');
+                    const safeFilename = path_1.default.basename(filename);
+                    const filePath = path_1.default.resolve(process.cwd(), 'uploads', safeFilename);
+                    if (fs_1.default.existsSync(filePath)) {
+                        try {
+                            fs_1.default.unlinkSync(filePath);
+                        }
+                        catch (err) {
+                            console.error('Failed to unlink file on transaction delete:', filePath, err);
+                        }
+                    }
+                }
+            }
         }
         await Transaction_1.Transaction.findByIdAndDelete(id);
         res.status(200).json({ message: 'Transaction deleted successfully' });

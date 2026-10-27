@@ -2,6 +2,31 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.Transaction = void 0;
 const mongoose_1 = require("mongoose");
+const attachmentSchema = new mongoose_1.Schema({
+    name: {
+        type: String,
+        required: true,
+        trim: true,
+    },
+    url: {
+        type: String,
+        required: true,
+        trim: true,
+    },
+    size: {
+        type: Number,
+        default: 0,
+    },
+    mimeType: {
+        type: String,
+        default: '',
+        trim: true,
+    },
+    uploadedAt: {
+        type: Date,
+        default: Date.now,
+    },
+}, { _id: true });
 const transactionSchema = new mongoose_1.Schema({
     projectId: {
         type: mongoose_1.Schema.Types.ObjectId,
@@ -32,6 +57,10 @@ const transactionSchema = new mongoose_1.Schema({
         type: Date,
         required: [true, 'Date is required'],
         default: Date.now,
+    },
+    attachments: {
+        type: [attachmentSchema],
+        default: [],
     },
 }, {
     timestamps: true,
